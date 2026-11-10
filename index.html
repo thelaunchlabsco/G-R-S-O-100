@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Gender Reveal Scratch Card</title>
+  <style>
+    *{box-sizing:border-box}html,body{margin:0}body{min-height:100vh;background:#f4f3f8;font-family:system-ui,Arial,sans-serif;text-align:center;color:#45506b;padding:14px 9px 30px}
+    .card{width:min(100%,450px);aspect-ratio:9/16;margin:0 auto;background:#fff;position:relative;overflow:hidden;box-shadow:0 10px 28px #263b561a;touch-action:none;user-select:none;-webkit-user-select:none}
+    .card img,.card canvas{position:absolute;inset:0;width:100%;height:100%;display:block}.card img{object-fit:fill}.card canvas{z-index:2;touch-action:none;cursor:crosshair}
+    .status{font-weight:700;margin:13px 0 6px}.note{font-size:13px;color:#758098}.controls button,.controls a{margin:5px;padding:10px 15px;border:0;border-radius:10px;background:#4e648b;color:#fff;cursor:pointer;text-decoration:none;font:inherit;display:inline-block}
+    .controls a{background:#f2c5d6;color:#45506b}.overlay{position:absolute;inset:0;z-index:5;background:#ffffffd9;display:none;align-items:center;justify-content:center;flex-direction:column;padding:20px}.overlay.show{display:flex}.overlay h2{margin:0 0 10px}.overlay p{line-height:1.5}
+  </style>
+</head>
+<body>
+  <div class="card" id="card">
+    <img src="images/back.png" alt="Six pink and blue stars to reveal" id="back">
+    <canvas id="scratch" aria-label="Scratch each of the six star circles to reveal"></canvas>
+    <div class="overlay" id="demoNotice"><h2>Demo Complete!</h2><p>Create your own card to share a personalized surprise.</p><div class="controls"><a href="customize.html">Customize My Card</a></div></div>
+  </div>
+  <p class="status" id="status" role="status">Scratch all six stars: 0 / 6</p>
+  <div class="controls"><button type="button" id="reset">Try Again</button></div>
+  <p class="note">Scratch each star until it clears — the reveal opens automatically when all six are complete.</p>
+  <script>
+    'use strict';
+    const CARD_CIRCLES=[
+      {x:.242,y:.650},{x:.502,y:.650},{x:.762,y:.650},
+      {x:.242,y:.799},{x:.502,y:.799},{x:.762,y:.799}
+    ];
+    const canvas=document.getElementById('scratch'),ctx=canvas.getContext('2d',{willReadFrequently:true});
+    const statusEl=document.getElementById('status');
+    const front=new Image();front.src='images/front.png';
+    let active=false,last=null,completed=new Set(),done=false;
+    const hash=location.hash;
+    function parseCard(){
+      const raw=new URLSearchParams(hash.slice(1)).get('card');if(!raw)return null;
+      try{
+        const decoded=atob(raw.replace(/-/g,'+').replace(/_/g,'/'));
+        const data=JSON.parse(decoded);const photo=new URL(data.p);
+        if(data.v!==1||!['girl','boy'].includes(data.g)||photo.protocol!=='https:'||photo.hostname!=='res.cloudinary.com'||!photo.pathname.includes('/image/upload/'))return null;
+        return data;
+      }catch(e){return null;}
+    }
+    const personalized=parseCard();
+    function pos(e){const rect=canvas.getBoundingClientRect();return{x:(e.clientX-rect.left)*canvas.width/rect.width,y:(e.clientY-rect.top)*canvas.height/rect.height};}
+    function radius(){return canvas.width*.115;}
+    function fit(){
+      const b=canvas.getBoundingClientRect();const scale=Math.min(devicePixelRatio||1,2);
+      canvas.width=Math.max(1,Math.round(b.width*scale));canvas.height=Math.max(1,Math.round(b.height*scale));drawFront();
+    }
+    function drawFront(){
+      ctx.globalCompositeOperation='source-over';ctx.clearRect(0,0,canvas.width,canvas.height);
+      if(front.complete&&front.naturalWidth){ctx.drawImage(front,0,0,canvas.width,canvas.height);}
+      else{ctx.fillStyle='#c7c9d4';ctx.fillRect(0,0,canvas.width,canvas.height);}
+      completed.clear();done=false;active=false;last=null;statusEl.textContent='Scratch all six stars: 0 / 6';document.getElementById('demoNotice').classList.remove('show');
+    }
+    function erase(x,y,prev){
+      ctx.globalCompositeOperation='destination-out';ctx.strokeStyle='rgba(0,0,0,1)';
+      ctx.lineWidth=canvas.width*.07;ctx.lineJoin='round';ctx.lineCap='round';
+      ctx.beginPath();ctx.moveTo(prev?.x??x,prev?.y??y);ctx.lineTo(x,y);ctx.stroke();
+      ctx.beginPath();ctx.arc(x,y,ctx.lineWidth*.5,0,Math.PI*2);ctx.fill();
+    }
+    function measureCircle(c){
+      const x=c.x*canvas.width,y=c.y*canvas.height,r=radius();
+      const left=Math.max(0,Math.floor(x-r)),top=Math.max(0,Math.floor(y-r));
+      const width=Math.min(canvas.width-left,Math.ceil(r*2)),height=Math.min(canvas.height-top,Math.ceil(r*2));
+      if(width<=0||height<=0)return 0;
+      let data;try{data=ctx.getImageData(left,top,width,height).data;}catch(e){return 0;}
+      let clear=0,count=0;const step=Math.max(1,Math.round(canvas.width/220));
+      for(let py=0;py<height;py+=step)for(let px=0;px<width;px+=step){
+        const dx=left+px-x,dy=top+py-y;if(dx*dx+dy*dy>r*r)continue;
+        count++;if(data[(py*width+px)*4+3]<90)clear++;
+      }
+      return count?clear/count:0;
+    }
+    function check(){
+      if(done)return;
+      CARD_CIRCLES.forEach((c,i)=>{
+        if(completed.has(i))return;
+        if(measureCircle(c)>=.32){
+          completed.add(i);
+          ctx.globalCompositeOperation='destination-out';ctx.beginPath();ctx.arc(c.x*canvas.width,c.y*canvas.height,radius(),0,Math.PI*2);ctx.fill();
+        }
+      });
+      statusEl.textContent='Scratch all six stars: '+completed.size+' / 6';
+      if(completed.size===6){
+        done=true;statusEl.textContent='All 6 stars revealed! Opening your surprise…';
+        if(personalized){
+          setTimeout(()=>{location.replace(personalized.g+'.html'+hash)},850);
+        }else{
+          document.getElementById('demoNotice').classList.add('show');
+          statusEl.textContent='Demo complete — create your own personal card!';
+        }
+      }
+    }
+    canvas.addEventListener('pointerdown',e=>{if(done)return;active=true;canvas.setPointerCapture(e.pointerId);last=pos(e);erase(last.x,last.y,null);e.preventDefault();});
+    canvas.addEventListener('pointermove',e=>{if(!active||done)return;const p=pos(e);erase(p.x,p.y,last);last=p;e.preventDefault();});
+    function stop(e){if(!active)return;active=false;last=null;check();e.preventDefault();}
+    canvas.addEventListener('pointerup',stop);canvas.addEventListener('pointercancel',stop);
+    document.getElementById('reset').addEventListener('click',drawFront);
+    front.onload=()=>fit();front.onerror=()=>fit();
+    window.addEventListener('resize',()=>{if(!done)fit();});
+    fit();
+  </script>
+</body>
+</html>
