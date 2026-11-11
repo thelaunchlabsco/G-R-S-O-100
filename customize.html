@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Create Your Gender Reveal | Customize</title>
+  <style>
+    :root{font-family:system-ui,-apple-system,Segoe UI,Arial,sans-serif;color:#333b4c;background:#fff8fb}
+    *{box-sizing:border-box}body{margin:0;padding:25px 14px 65px}
+    .wrap{max-width:950px;margin:auto}.top{text-align:center;margin-bottom:25px}
+    h1{margin:0 0 7px;font-size:clamp(25px,4vw,39px);color:#303e5b}.subtitle{margin:0;color:#70778a}
+    .layout{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,.8fr);gap:25px;align-items:start}
+    .panel{background:white;border:1px solid #f0e3ec;border-radius:22px;padding:24px;box-shadow:0 8px 30px #91658a11}
+    .label{display:block;font-weight:700;margin:2px 0 12px}.options{display:flex;gap:12px;margin-bottom:24px}
+    .option{border:2px solid #e3e3ea;background:white;color:#3b4358;border-radius:14px;padding:15px 10px;flex:1;font-size:17px;font-weight:700;cursor:pointer}
+    .option[aria-pressed="true"]{border-color:#ea6f9a;background:#fff0f5}.option.boy[aria-pressed="true"]{border-color:#74a9f6;background:#ebf3ff}
+    .file-btn{width:100%;border:2px dashed #c8bad0;padding:29px 16px;border-radius:14px;text-align:center;background:#faf8fb;cursor:pointer;font:inherit;color:#3b4358;display:block}
+    .file-btn strong{display:block;margin-bottom:4px}.file-btn small{color:#7b7f8c}
+    input[type=file]{position:absolute;width:1px;height:1px;opacity:0;overflow:hidden}
+    .hint{font-size:12px;color:#7b7f8c;margin:9px 0 22px}
+    button.primary{width:100%;border:0;padding:15px 16px;border-radius:13px;color:#fff;background:#303e5b;font-weight:750;font-size:16px;cursor:pointer}
+    button.primary:disabled{opacity:.45;cursor:not-allowed}.status{min-height:22px;margin-top:13px;font-size:13px;color:#556075}
+    .result{display:none;border-top:1px solid #eae2e9;margin-top:19px;padding-top:17px}.result.show{display:block}
+    .result label{font-size:13px;font-weight:700}.link-box{width:100%;padding:12px 10px;border:1px solid #e0dae4;border-radius:10px;color:#3c455a;font-size:12px;margin:8px 0}
+    .btn-row{display:flex;gap:9px}.smallbtn{padding:10px 15px;border:1px solid #d7cddd;background:#fff;border-radius:10px;cursor:pointer;font-weight:700;color:#38425b}
+    .preview-wrap{text-align:center}.preview-label{color:#677087;margin:0 0 10px;font-size:13px;font-weight:700}
+    .preview{width:min(100%,310px);aspect-ratio:9/16;margin:auto;position:relative;overflow:hidden;border-radius:12px;background:#e9e9f0;box-shadow:0 8px 22px #18213919}
+    .template,.photo-holder{position:absolute;inset:0;width:100%;height:100%}.template{display:block;object-fit:fill}
+    .photo-holder{-webkit-mask-image:url('images/photo-window.svg?v=3');mask-image:url('images/photo-window.svg?v=3');-webkit-mask-size:100% 100%;mask-size:100% 100%;pointer-events:none}
+    .photo-holder img{position:absolute;left:0;top:27%;width:100%;height:68%;object-fit:cover;object-position:center;filter:grayscale(100%)}
+    .preview-note{margin:12px 0 0;color:#898394;font-size:12px}
+    @media(max-width:720px){.layout{grid-template-columns:1fr}.panel{padding:18px}.preview-wrap{order:-1}.preview{width:min(70%,260px)}}
+  </style>
+</head>
+<body>
+  <main class="wrap">
+    <header class="top"><h1>Create Your Gender Reveal</h1><p class="subtitle">Choose your design, add one photo, and create your shareable scratch-card link.</p></header>
+    <div class="layout">
+      <section class="panel" aria-label="Personalization">
+        <span class="label">1. Choose your reveal</span>
+        <div class="options">
+          <button type="button" class="option" id="girlBtn" aria-pressed="true">♡ Girl</button>
+          <button type="button" class="option boy" id="boyBtn" aria-pressed="false">☆ Boy</button>
+        </div>
+        <label for="photo" class="label">2. Upload your photo</label>
+        <label class="file-btn" for="photo"><strong id="photoLabel">Choose Photo</strong><small>JPG, PNG or WebP · up to 5 MB</small></label>
+        <input id="photo" type="file" accept="image/jpeg,image/png,image/webp">
+        <p class="hint">Your photo will appear in the torn-paper photo area in black and white. No name or message editing is required.</p>
+        <button class="primary" id="generate" type="button" disabled>Generate My Shareable Link</button>
+        <p class="status" id="status" role="status" aria-live="polite"></p>
+        <div class="result" id="result">
+          <label for="shareLink">Your personalized link — share with family and friends:</label>
+          <input class="link-box" id="shareLink" type="text" readonly>
+          <div class="btn-row">
+            <button class="smallbtn" id="copy" type="button">Copy Link</button>
+            <button class="smallbtn" id="openGame" type="button">Preview Game</button>
+          </div>
+        </div>
+      </section>
+      <aside class="panel preview-wrap">
+        <p class="preview-label">YOUR REVEAL PREVIEW</p>
+        <div class="preview" aria-label="Your chosen photo in the selected design">
+          <img class="template" id="designPreview" src="images/girl.png" alt="Gender reveal design">
+          <div class="photo-holder"><img id="photoPreview" alt="Your chosen photo" hidden></div>
+        </div>
+        <p class="preview-note">Preview shows your chosen background and photo.</p>
+      </aside>
+    </div>
+  </main>
+  <script>
+    'use strict';
+    // Cloudinary details from your screenshots. Check the CLOUD_NAME spelling in your own dashboard.
+    const CLOUD_NAME = 'jmmlbvjm';
+    const UPLOAD_PRESET = 'gender_reveal_photos';
+    const MAX_BYTES = 5 * 1024 * 1024;
+    let gender='girl', photoFile=null, previewObjectUrl=null;
+    const $=id=>document.getElementById(id);
+    const status=(msg,isError=false)=>{ $('status').textContent=msg; $('status').style.color=isError?'#bb3553':'#556075'; };
+    function selectGender(next){
+      gender=next;
+      $('girlBtn').setAttribute('aria-pressed',String(next==='girl'));
+      $('boyBtn').setAttribute('aria-pressed',String(next==='boy'));
+      $('designPreview').src='images/'+next+'.png?v=3';
+      $('result').classList.remove('show');
+    }
+    $('girlBtn').addEventListener('click',()=>selectGender('girl'));
+    $('boyBtn').addEventListener('click',()=>selectGender('boy'));
+    $('photo').addEventListener('change',()=>{
+      const f=$('photo').files?.[0];
+      $('result').classList.remove('show');
+      photoFile=null;$('generate').disabled=true;
+      if(!f){$('photoLabel').textContent='Choose Photo';return;}
+      if(!['image/jpeg','image/png','image/webp'].includes(f.type)){status('Please choose a JPG, PNG, or WebP image.',true);return;}
+      if(f.size>MAX_BYTES){status('Photo is too large. Please choose one under 5 MB.',true);return;}
+      if(previewObjectUrl) URL.revokeObjectURL(previewObjectUrl);
+      previewObjectUrl=URL.createObjectURL(f);
+      $('photoPreview').src=previewObjectUrl;$('photoPreview').hidden=false;
+      $('photoLabel').textContent=f.name;
+      photoFile=f;$('generate').disabled=false;status('Ready! Check the preview, then generate your link.');
+    });
+    function encodeCard(payload){
+      return btoa(JSON.stringify(payload)).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
+    }
+    $('generate').addEventListener('click',async()=>{
+      if(!photoFile)return;
+      $('generate').disabled=true;status('Uploading your photo…');
+      try{
+        const body=new FormData();body.append('file',photoFile);body.append('upload_preset',UPLOAD_PRESET);
+        const response=await fetch('https://api.cloudinary.com/v1_1/'+encodeURIComponent(CLOUD_NAME)+'/image/upload',{method:'POST',body});
+        const data=await response.json();
+        if(!response.ok||!data.secure_url)throw new Error(data.error?.message||'Upload failed');
+        const photoURL=new URL(data.secure_url);
+        if(photoURL.protocol!=='https:'||photoURL.hostname!=='res.cloudinary.com')throw new Error('Unexpected upload URL');
+        const game=new URL('index.html',location.href);
+        game.hash='card='+encodeCard({v:1,g:gender,p:data.secure_url});
+        $('shareLink').value=game.href;
+        $('result').classList.add('show');status('Success! Copy your personal game link and share it.');
+      }catch(err){status('Could not upload: '+err.message+'. Check your Cloud Name and preset.',true);}
+      finally{$('generate').disabled=false;}
+    });
+    $('copy').addEventListener('click',async()=>{
+      try{await navigator.clipboard.writeText($('shareLink').value);status('Link copied!');}
+      catch(err){$('shareLink').select();document.execCommand('copy');status('Select and copy your link from the box.');}
+    });
+    $('openGame').addEventListener('click',()=>window.open($('shareLink').value,'_blank','noopener'));
+  </script>
+</body>
+</html>
